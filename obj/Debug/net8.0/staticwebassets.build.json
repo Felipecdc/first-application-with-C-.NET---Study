@@ -1,0 +1,11 @@
+{
+  "Version": 1,
+  "Hash": "z5GvFt3tUiZgtOnjqvgtL5O5VtQwPwkEKiiOqZsE2yQ=",
+  "Source": "first_dotnet_api",
+  "BasePath": "_content/first_dotnet_api",
+  "Mode": "Default",
+  "ManifestType": "Build",
+  "ReferencedProjectsConfiguration": [],
+  "DiscoveryPatterns": [],
+  "Assets": []
+}
