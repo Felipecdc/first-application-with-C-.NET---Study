@@ -1,20 +1,31 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using first_dotnet_api.Data;
 using first_dotnet_api.Models;
 
-[ApiController] // Marca essa classe como um controller de API
-[Route("[controller]")] // Define a rota base: /task
+[ApiController]
+[Route("[controller]")] 
 public class TaskController : ControllerBase
 {
-    private static List<TaskItem> tasks = new(); // Lista em memória com as tarefas
 
-    [HttpGet] // GET /task → retorna todas as tarefas
-    public IActionResult GetAll() => Ok(tasks);
-
-    [HttpGet("{id}")] // GET /task/{id} → retorna uma tarefa específica
-    public IActionResult GetById(int id)
+    private readonly AppDbContext _context;
+    
+    public TaskController(AppDbContext context)
     {
-        var task = tasks.FirstOrDefault(t => t.Id == id); // Busca tarefa pelo ID
+        _context = context;
+    }
 
+    [HttpGet] 
+    public async Task<IActionResult> GetAll() 
+    {
+        var tasks = await _context.TaskItems.ToListAsync();
+        return Ok(tasks);
+    }
+
+    [HttpGet("{id}")] 
+    public async Task<IActionResult> GetById(int id)
+    {
+        var task = await _context.TaskItems.FindAsync(id);
         if (task == null)
         {
             return NotFound(new
@@ -24,35 +35,38 @@ public class TaskController : ControllerBase
                 idBuscado = id            
             });
         } 
-        return Ok(task); // Retorna a tarefa se existir
+        
+        return Ok(task); 
     }
 
-    [HttpPost] // POST /task → cria uma nova tarefa
-    public IActionResult Create(TaskItem task)
+    [HttpPost] 
+    public async Task<IActionResult> Create(TaskItem task)
     {
-        task.Id = tasks.Count + 1; // Define ID automaticamente
-        tasks.Add(task); // Adiciona à lista
-        return CreatedAtAction(nameof(GetById), new { id = task.Id }, task); // Retorna 201
+        task.CreatedAt = DateTime.UtcNow; 
+        _context.TaskItems.Add(task);
+        await _context.SaveChangesAsync();
+
+        return CreatedAtAction(nameof(GetById), new { id = task.Id }, task); 
     }
 
-    [HttpPut("{id}")] // PUT /task/{id} → atualiza uma tarefa
-    public IActionResult Update(int id, TaskItem updatedTask)
+    [HttpPut("{id}")]
+    public async Task<IActionResult> Update(int id, TaskItem updatedTask)
     {
-        var task = tasks.FirstOrDefault(t => t.Id == id); // Busca pelo ID
+        var task = await _context.TaskItems.FindAsync(id); 
         if (task == null)
-            return NotFound(); // Retorna 404 se não achar
+            return NotFound();
 
-        // Atualiza os dados da tarefa
         task.Title = updatedTask.Title;
         task.IsCompleted = updatedTask.IsCompleted;
 
-        return NoContent(); // Retorna 204 (sem conteúdo)
+        await _context.SaveChangesAsync();
+        return NoContent();
     }
 
-    [HttpDelete("{id}")] // DELETE /task/{id} → remove uma tarefa
-    public IActionResult Delete(int id)
+    [HttpDelete("{id}")]
+    public async Task<IActionResult> Delete(int id)
     {
-        var task = tasks.FirstOrDefault(t => t.Id == id); // Busca tarefa
+        var task = await _context.TaskItems.FindAsync(id);
         if (task == null) 
             return NotFound(new
             {
@@ -61,7 +75,8 @@ public class TaskController : ControllerBase
                 idBuscado = id
             });        
 
-        tasks.Remove(task); // Remove da lista
+        _context.TaskItems.Remove(task);
+        await _context.SaveChangesAsync();
 
         return Ok(new
         {
@@ -76,20 +91,20 @@ public class TaskController : ControllerBase
         });    
     }
 
-    [HttpGet("completed/{status}")] // GET /task/completed/{true/false} → filtra por status
-    public IActionResult GetByCompletionStatus(bool status)
+    [HttpGet("completed/{status}")] 
+    public async Task<IActionResult> GetByCompletionStatus(bool status)
     {
-        var filteredTasks = tasks
-            .Where(t => t.IsCompleted == status) // Filtra pelo status
-            .ToList();
+        var filteredTasks = await _context.TaskItems
+            .Where(t => t.IsCompleted == status)
+            .ToListAsync();
 
-        return Ok(filteredTasks); // Retorna tarefas filtradas
+        return Ok(filteredTasks); 
     }
 
-    [HttpPut("{id}/complete")] // PUT /task/{id}/complete → marca como concluída
-    public IActionResult MarkAsCompleted(int id)
+    [HttpPut("{id}/complete")] 
+    public async Task<IActionResult> MarkAsCompleted(int id)
     {
-        var task = tasks.FirstOrDefault(t => t.Id == id); // Busca tarefa
+        var task = await _context.TaskItems.FindAsync(id); 
         if (task == null)
             return NotFound(new
             {
@@ -98,23 +113,24 @@ public class TaskController : ControllerBase
                 idBuscado = id
             }); 
         
-        task.IsCompleted = true; // Marca como completa
-        return Ok(task); // Retorna a tarefa atualizada
+        task.IsCompleted = true; 
+
+        await _context.SaveChangesAsync();
+        return Ok(task);
     }
 
-    [HttpGet("paged")] // GET /task/paged?page=1&pageSize=5 → paginação
-    public IActionResult GetPaged(int page = 1, int pageSize = 5)
+    [HttpGet("paged")] 
+    public async Task<IActionResult> GetPaged(int page = 1, int pageSize = 5)
     {
-        // Pega somente os itens da página atual
-        var pagedTasks = tasks 
+
+        var tasks = await _context.TaskItems.ToListAsync();
+        var pagedTasks = tasks
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .ToList();
 
-        // Calcula total de páginas
         var totalPages = (int)Math.Ceiling((double)tasks.Count / pageSize);
 
-        // Retorna metadados da paginação + tarefas
         return Ok(new 
         {
             page,
